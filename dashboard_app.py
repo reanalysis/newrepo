@@ -3,89 +3,107 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-# Load data
+st.set_page_config(page_title="Section 8 Reports Dashboard", layout="wide")
+
+# Load Data
 @st.cache_data
 def load_data():
-    df = pd.read_csv("fake_property_listings.csv", parse_dates=["ListingDate"])
-    return df
+    return pd.read_csv("fake_property_listings.csv", parse_dates=["ListingDate"])
 
 df = load_data()
 
-# Title and description
-st.set_page_config(page_title="Real Estate Dashboard", layout="wide")
-st.title("🏠 Property Listings Dashboard")
-st.markdown("""
-This interactive dashboard allows real estate professionals, renters, and buyers to explore available listings.
-Use the filters to customize your search and gain insights into the housing market.
-""")
+st.title("🏠 Section 8 Report Dashboard")
+st.markdown("This dashboard simulates the results of 20 key SQL queries defined in Section 6.")
 
-# Sidebar filters
-st.sidebar.header("Filter Listings")
+# 1. BETWEEN
+st.subheader("1. BETWEEN: Security Deposits Between $1500 and $2000")
+between_df = df[(df["SecurityDeposit"] >= 1500) & (df["SecurityDeposit"] <= 2000)]
+st.dataframe(between_df[["PropertyID", "SecurityDeposit"]])
 
-property_types = st.sidebar.multiselect(
-    "Select Property Type", options=df["PropertyType"].unique(), default=df["PropertyType"].unique()
-)
+# 2. ALIASES
+st.subheader("2. ALIASES: Agent Names and Phone Numbers")
+st.dataframe(df[["AgentName", "AgentPhoneNumber"]].drop_duplicates())
 
-markets = st.sidebar.multiselect(
-    "Select Market", options=df["PropertyMarket"].unique(), default=df["PropertyMarket"].unique()
-)
+# 3. AND
+st.subheader("3. AND: Properties with ≥ 3 Bedrooms and ≥ 2 Bathrooms")
+st.dataframe(df[(df["Bedrooms"] >= 3) & (df["Bathrooms"] >= 2)][["PropertyID", "Bedrooms", "Bathrooms"]])
 
-bedrooms = st.sidebar.slider("Minimum Bedrooms", min_value=1, max_value=5, value=1)
-bathrooms = st.sidebar.slider("Minimum Bathrooms", min_value=1, max_value=3, value=1)
+# 4. LIKE
+st.subheader("4. LIKE: Agents Whose Names Start With 'J'")
+like_df = df[df["AgentName"].str.startswith("J")]
+st.dataframe(like_df[["AgentName", "AgentEmail"]].drop_duplicates())
 
-min_price, max_price = st.sidebar.slider(
-    "Price Range", min_value=int(df["Amount"].min()), max_value=int(df["Amount"].max()),
-    value=(1000, 500000)
-)
+# 5. IN
+st.subheader("5. IN: Available Houses and Condos")
+st.dataframe(df[df["PropertyType"].isin(["House", "Condo"])])
 
-date_range = st.sidebar.date_input(
-    "Listing Date Range",
-    value=[df["ListingDate"].min(), df["ListingDate"].max()]
-)
+# 6. GROUP BY
+st.subheader("6. GROUP BY: Count of Listings by Property Type")
+grouped = df["PropertyType"].value_counts().reset_index()
+grouped.columns = ["PropertyType", "Count"]
+st.bar_chart(grouped.set_index("PropertyType"))
 
-# Apply filters
-filtered_df = df[
-    (df["PropertyType"].isin(property_types)) &
-    (df["PropertyMarket"].isin(markets)) &
-    (df["Bedrooms"] >= bedrooms) &
-    (df["Bathrooms"] >= bathrooms) &
-    (df["Amount"] >= min_price) &
-    (df["Amount"] <= max_price) &
-    (df["ListingDate"] >= pd.to_datetime(date_range[0])) &
-    (df["ListingDate"] <= pd.to_datetime(date_range[1]))
-]
+# 7. HAVING
+st.subheader("7. HAVING: Property Types With More Than 2 Listings")
+having_df = grouped[grouped["Count"] > 2]
+st.dataframe(having_df)
 
-# Display filtered data
-st.subheader(f"📋 Filtered Listings: {len(filtered_df)} Found")
-st.dataframe(filtered_df.style.format({
-    "Amount": "${:,.0f}",
-    "SecurityDeposit": "${:,.0f}",
-    "SqFt": "{:,.0f} sq ft"
-}))
+# 8. COMPARISON
+st.subheader("8. COMPARISON: Properties Listed After March 2022")
+st.dataframe(df[df["ListingDate"] >= "2022-03-01"])
 
-# KPI Metrics
-st.markdown("### 📈 Key Metrics")
-col1, col2, col3 = st.columns(3)
-col1.metric("Average Price", f"${int(filtered_df['Amount'].mean()):,}")
-col2.metric("Average SqFt", f"{int(filtered_df['SqFt'].mean()):,} sq ft")
-col3.metric("Average Deposit", f"${int(filtered_df['SecurityDeposit'].mean()):,}")
+# 9. AGGREGATE
+st.subheader("9. AGGREGATE: Average Square Footage")
+avg_sqft = int(df["SqFt"].mean())
+st.metric(label="Average SqFt", value=f"{avg_sqft:,} sq ft")
 
-# Charts
-st.markdown("### 📊 Visual Insights")
-col4, col5 = st.columns(2)
+# 10. INNER JOIN (2 tables)
+st.subheader("10. INNER JOIN: Property and Assigned Agent Info")
+st.dataframe(df[["PropertyID", "AgentName"]])
 
-with col4:
-    fig1 = px.histogram(filtered_df, x="PropertyType", title="Listings by Property Type")
-    st.plotly_chart(fig1, use_container_width=True)
+# 11. INNER JOIN (3 tables)
+st.subheader("11. INNER JOIN 3: Property, Agent, and Security Deposit")
+st.dataframe(df[["PropertyID", "AgentName", "SecurityDeposit"]])
 
-with col5:
-    fig2 = px.pie(filtered_df, names="PropertyMarket", title="Market Distribution")
-    st.plotly_chart(fig2, use_container_width=True)
+# 12. LEFT OUTER JOIN
+st.subheader("12. OUTER JOIN: All Agents and the Properties They Are Assigned To")
+st.dataframe(df[["AgentName", "PropertyType"]].drop_duplicates())
 
-st.markdown("### 💰 Top 10 Most Expensive Listings")
-top10 = filtered_df.sort_values(by="Amount", ascending=False).head(10)
-st.table(top10[["PropertyID", "PropertyType", "Amount", "Bedrooms", "Bathrooms", "SqFt"]])
+# 13. UNION
+st.subheader("13. UNION: Unit Numbers for Apartments and Condos")
+st.dataframe(df[df["PropertyType"].isin(["Apartment", "Condo"])][["PropertyID", "PropertyType"]])
 
-# Footer
+# 14. SELF JOIN
+st.subheader("14. SELF JOIN: Pairs of Properties with the Same Type")
+joined = df[["PropertyID", "PropertyType"]].merge(
+    df[["PropertyID", "PropertyType"]], on="PropertyType")
+self_join_df = joined[joined["PropertyID_x"] != joined["PropertyID_y"]]
+st.dataframe(self_join_df.head(10))
+
+# 15. EQUI JOIN
+st.subheader("15. EQUI JOIN: Agent Name and Property Type")
+st.dataframe(df[["AgentName", "PropertyType"]].drop_duplicates())
+
+# 16. EXISTS
+st.subheader("16. EXISTS: Agents Assigned to at Least One Property")
+st.dataframe(df[["AgentName"]].drop_duplicates())
+
+# 17. NON-CORRELATED SUBQUERY
+st.subheader("17. NON-CORRELATED SUBQUERY: Property Types with Price Over $1800")
+st.dataframe(df[df["Amount"] > 1800][["PropertyType", "Amount"]])
+
+# 18. CORRELATED SUBQUERY
+st.subheader("18. CORRELATED SUBQUERY: Agents Assigned to Houses")
+st.dataframe(df[df["PropertyType"] == "House"][["AgentName", "PropertyType"]].drop_duplicates())
+
+# 19. NOT IN
+st.subheader("19. NOT IN: Agents Not in Agencies 501 and 502")
+st.write("Note: Since we don't have agency IDs, simulating with AgentName not starting with J")
+st.dataframe(df[~df["AgentName"].str.startswith("J")][["AgentName", "AgentEmail"]].drop_duplicates())
+
+# 20. OR
+st.subheader("20. OR: Properties That Are Apartments or Condos")
+st.dataframe(df[df["PropertyType"].isin(["Apartment", "Condo"])])
+
 st.markdown("---")
-st.caption("Built with ❤️ using Streamlit · Data: fake_property_listings.csv")
+st.caption("Simulated Section 6 SQL Queries · Powered by Streamlit and Pandas")
